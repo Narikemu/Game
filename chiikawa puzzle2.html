@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ちいかわ目隠しパズル・完成版</title>
+    <style>
+        body { 
+            text-align: center; 
+            font-family: 'Helvetica Neue', Arial, sans-serif; 
+            background-color: #fff9e6; 
+            margin: 0; 
+            /* iPhoneの下部バーを避けるための十分な余白 */
+            padding: 10px 0 calc(80px + env(safe-area-inset-bottom)) 0;
+            overflow-y: auto;
+            touch-action: none;
+            -webkit-user-select: none;
+        }
+
+        h1 { font-size: 18px; color: #555; margin: 5px 0; }
+        
+        #message-box {
+            background: white;
+            border-radius: 15px;
+            padding: 10px;
+            margin: 5px auto;
+            width: 85%;
+            max-width: 320px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            min-height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #message { font-weight: bold; font-size: 14px; color: #ff66aa; line-height: 1.4; }
+
+        #game-container { 
+            position: relative; 
+            width: 340px; 
+            height: 430px; 
+            margin: 5px auto; 
+            border: 6px solid #ffcc00; 
+            background: #fff; 
+            border-radius: 20px;
+            overflow: hidden; 
+            touch-action: none;
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+
+        .part { 
+            position: absolute; 
+            transform: translate(-50%, -50%); 
+            pointer-events: none; 
+        }
+
+        #floating-part {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0.8;
+            display: none;
+        }
+
+        #ui-panel { 
+            margin-top: 25px;
+            padding-bottom: 20px;
+        }
+
+        .btn {
+            padding: 16px 50px;
+            font-size: 18px;
+            background: #ffcc00;
+            border: none;
+            border-radius: 50px;
+            font-weight: bold;
+            color: white;
+            box-shadow: 0 5px 0 #e6b800;
+            cursor: pointer;
+            display: inline-block;
+            transition: all 0.1s;
+            -webkit-appearance: none;
+        }
+
+        .btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 2px 0 #e6b800;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>ちいかわ目隠しパズル</h1>
+    <div id="message-box"><div id="message">画面を動かすとBGMが流れるよ！</div></div>
+    
+    <div id="game-container">
+        <img id="floating-part" src="">
+    </div>
+
+    <div id="ui-panel">
+        <button class="btn" onclick="location.reload()">もう一度あそぶ</button>
+    </div>
+
+    <script>
+        const container = document.getElementById('game-container');
+        const message = document.getElementById('message');
+        const floatingPart = document.getElementById('floating-part');
+        
+        const folder = "Chiikawa/";
+        const extension = ".PNG"; 
+
+        // --- BGM設定 ---
+        const bgm = new Audio();
+        bgm.src = "bgm.mp3"; // Local直下
+        bgm.loop = true;
+        bgm.preload = "auto";
+        let audioStarted = false;
+
+        const partsList = [
+            { id: "head", name: "あたま", size: 260 },
+            { id: "body", name: "からだ", size: 200 },
+            { id: "ear_r", name: "みぎ耳", size: 90 },
+            { id: "ear_l", name: "ひだり耳", size: 90 },
+            { id: "eye_r", name: "みぎ目", size: 40 },
+            { id: "eye_l", name: "ひだり目", size: 40 },
+            { id: "brow_r", name: "みぎ眉", size: 35 },
+            { id: "brow_l", name: "ひだり眉", size: 35 },
+            { id: "cheek_r", name: "みぎほっぺ", size: 45 },
+            { id: "cheek_l", name: "ひだりほっぺ", size: 45 },
+            { id: "mouth", name: "くち", size: 55 },
+            { id: "arm_r", name: "みぎ手", size: 50 },
+            { id: "arm_l", name: "ひだり手", size: 50 },
+            { id: "feet_r", name: "みぎ足", size: 50 },
+            { id: "feet_l", name: "ひだり足", size: 50 }
+        ];
+
+        let currentStep = 0;
+        let placedParts = [];
+        let isFinished = false;
+        let lastPosX = 175; // 中央付近を初期値に
+        let lastPosY = 215;
+
+        // BGM開始の関数
+        function startBGM() {
+            if (!audioStarted) {
+                bgm.play().then(() => {
+                    audioStarted = true;
+                }).catch(err => {
+                    // もしbgm.mp3が小文字でダメなら大文字を試す
+                    if (bgm.src.includes(".mp3")) {
+                        bgm.src = "bgm.MP3";
+                        bgm.play();
+                    }
+                });
+            }
+        }
+
+        function updateFloatingPart() {
+            if (currentStep < partsList.length) {
+                const data = partsList[currentStep];
+                floatingPart.src = folder + data.id + extension;
+                floatingPart.style.width = data.size + "px";
+                floatingPart.style.display = "block";
+                // 最初は中央に表示しておく
+                floatingPart.style.left = "50%";
+                floatingPart.style.top = "50%";
+                message.innerText = `「${data.name}」をドラッグして配置！`;
+            } else {
+                floatingPart.style.display = "none";
+                showResult();
+            }
+        }
+
+        function movePart(e) {
+            if (isFinished) return;
+            startBGM(); // 操作開始で音を鳴らす
+            const rect = container.getBoundingClientRect();
+            const clientX = (e.touches && e.touches[0]) ? e.touches[0].clientX : e.clientX;
+            const clientY = (e.touches && e.touches[0]) ? e.touches[0].clientY : e.clientY;
+            
+            lastPosX = clientX - rect.left;
+            lastPosY = clientY - rect.top;
+            
+            floatingPart.style.left = lastPosX + 'px';
+            floatingPart.style.top = lastPosY + 'px';
+        }
+
+        function dropPart() {
+            if (currentStep >= partsList.length || isFinished) return;
+            const currentData = partsList[currentStep];
+            const img = document.createElement('img');
+            img.src = folder + currentData.id + extension;
+            img.className = 'part';
+            img.style.width = currentData.size + "px";
+            img.style.left = lastPosX + 'px';
+            img.style.top = lastPosY + 'px';
+            img.style.display = 'none'; // 配置時は隠す
+            
+            // 画像読み込みエラー時のリトライ設定
+            img.onerror = () => {
+                if (img.src.includes(".PNG")) img.src = img.src.replace(".PNG", ".png");
+            };
+
+            container.appendChild(img);
+            placedParts.push(img);
+            currentStep++;
+            updateFloatingPart();
+        }
+
+        // イベントの設定
+        container.addEventListener('mousemove', movePart);
+        container.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            movePart(e);
+        }, { passive: false });
+
+        container.addEventListener('mouseup', dropPart);
+        container.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            dropPart();
+        }, { passive: false });
+
+        function showResult() {
+            isFinished = true;
+            message.innerHTML = "✨ 完成 ✨<br>変な顔になっちゃった！？";
+            placedParts.forEach(p => p.style.display = 'block');
+        }
+
+        // 初期化
+        updateFloatingPart();
+        
+        // floatingPartの読み込みエラー対策
+        floatingPart.onerror = () => {
+            if (floatingPart.src.includes(".PNG")) {
+                floatingPart.src = floatingPart.src.replace(".PNG", ".png");
+            }
+        };
+    </script>
+</body>
+</html>
